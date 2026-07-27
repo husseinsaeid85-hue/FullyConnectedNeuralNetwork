@@ -1,3 +1,10 @@
+"""Development utilities: numerical gradient checking and toy data sources.
+
+These helpers are not part of the framework itself. They exist to verify that
+the analytical gradients implemented in each layer match finite-difference
+estimates, and to supply batches for quick end-to-end runs.
+"""
+
 import numpy as np
 from sklearn.datasets import load_iris
 from sklearn.preprocessing import OneHotEncoder
@@ -5,6 +12,17 @@ from random import shuffle
 
 
 def gradient_check(layers, input_tensor, label_tensor):
+    """Compare analytical and numerical gradients w.r.t. the network input.
+
+    Args:
+        layers: Layer stack whose last element is the loss layer.
+        input_tensor: Batch fed to the first layer.
+        label_tensor: One-hot labels for the batch.
+
+    Returns:
+        Array shaped like ``input_tensor`` holding the relative difference per
+        entry. Values near zero mean the analytical gradient is correct.
+    """
     epsilon = 1e-5
     difference = np.zeros_like(input_tensor)
     for i in range(input_tensor.shape[0]):
@@ -42,6 +60,18 @@ def gradient_check(layers, input_tensor, label_tensor):
 
 
 def gradient_check_weights(layers, input_tensor, label_tensor, bias):
+    """Compare analytical and numerical gradients w.r.t. the first layer's parameters.
+
+    Args:
+        layers: Layer stack whose last element is the loss layer.
+        input_tensor: Batch fed to the first layer.
+        label_tensor: One-hot labels for the batch.
+        bias: Check the bias term instead of the weight matrix.
+
+    Returns:
+        Array shaped like the checked parameter holding the relative
+        difference per entry.
+    """
     epsilon = 1e-5
     if bias:
         weights = layers[0].bias
@@ -108,6 +138,15 @@ def gradient_check_weights(layers, input_tensor, label_tensor, bias):
 
 
 def shuffle_data(input_tensor, label_tensor):
+    """Shuffle samples and labels together, preserving their pairing.
+
+    Args:
+        input_tensor: Samples with shape ``[n, ...]``.
+        label_tensor: Labels with shape ``[n, ...]``.
+
+    Returns:
+        Tuple of the shuffled samples and labels.
+    """
     index_shuffling = [i for i in range(input_tensor.shape[0])]
     shuffle(index_shuffling)
     shuffled_input = [input_tensor[i, :] for i in index_shuffling]
@@ -116,6 +155,17 @@ def shuffle_data(input_tensor, label_tensor):
 
 
 class RandomData:
+    """Data source emitting uniform noise with random one-hot labels.
+
+    Useful for smoke-testing shapes and the training loop; there is no signal
+    to learn, so the loss is not expected to fall.
+
+    Args:
+        input_size: Number of features per sample.
+        batch_size: Samples returned per call to :meth:`next`.
+        categories: Number of classes.
+    """
+
     def __init__(self, input_size, batch_size, categories):
         self.input_size = input_size
         self.batch_size = batch_size
@@ -123,6 +173,7 @@ class RandomData:
         self.label_tensor = np.zeros([self.batch_size, self.categories])
 
     def next(self):
+        """Return a fresh random batch as ``(input_tensor, label_tensor)``."""
         input_tensor = np.random.random([self.batch_size, self.input_size])
 
         self.label_tensor = np.zeros([self.batch_size, self.categories])
@@ -133,6 +184,16 @@ class RandomData:
 
 
 class IrisData:
+    """Iris dataset wrapper providing shuffled training batches.
+
+    Features are scaled by their global maximum absolute value, labels are
+    one-hot encoded, and the data is split two-thirds train / one-third test.
+    :meth:`next` cycles through the training set in random epochs.
+
+    Args:
+        batch_size: Samples returned per call to :meth:`next`.
+    """
+
     def __init__(self, batch_size):
         self.batch_size = batch_size
         self._data = load_iris()
@@ -159,8 +220,10 @@ class IrisData:
                 yield this_idx[i * self.batch_size:(i + 1) * self.batch_size]
 
     def next(self):
+        """Return the next training batch as ``(input_tensor, label_tensor)``."""
         idx = next(self._current_forward_idx_iterator)
         return self._input_tensor_train[idx, :], self._label_tensor_train[idx, :]
 
     def get_test_set(self):
+        """Return the held-out test split as ``(input_tensor, label_tensor)``."""
         return self._input_tensor_test, self._label_tensor_test

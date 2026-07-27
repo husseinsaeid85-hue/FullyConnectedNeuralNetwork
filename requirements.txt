@@ -1,0 +1,8 @@
+# Core framework dependency: Layers/, Optimization/ and NeuralNetwork.py
+# need nothing beyond NumPy and the standard library.
+numpy>=1.21
+
+# Only required by Layers/Helpers.py, which supplies the Iris dataset used in
+# the usage example. Pinned below 1.4 because OneHotEncoder(sparse=...) was
+# removed in scikit-learn 1.4 in favour of sparse_output=...
+scikit-learn>=1.0,<1.4
