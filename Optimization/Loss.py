@@ -35,4 +35,7 @@ class CrossEntropyLoss:
             Gradient w.r.t. the predictions from the last :meth:`forward`,
             non-zero only at the true class.
         """
-        return np.where(label_tensor == 1, -1 / self.prediction_tensor+np.finfo(float).eps, 0)
+        # The epsilon belongs inside the denominator, matching the forward pass's
+        # -log(p + eps). Outside it, the division is unguarded and blows up to
+        # inf/nan whenever a predicted probability reaches exactly zero.
+        return np.where(label_tensor == 1, -1 / (self.prediction_tensor + np.finfo(float).eps), 0)
